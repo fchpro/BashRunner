@@ -62,9 +62,7 @@ class CommandStorage:
             try:
                 with open(self.commands_file, encoding="utf-8") as f:
                     data = json.load(f)
-                    self._commands = [
-                        Command.from_dict(cmd) for cmd in data.get("commands", [])
-                    ]
+                    self._commands = [Command.from_dict(cmd) for cmd in data.get("commands", [])]
                 logger.info(f"Loaded {len(self._commands)} commands from storage")
             except Exception as e:
                 logger.error(f"Failed to load commands: {e}")
@@ -176,9 +174,7 @@ class CommandStorage:
                     logger.info(f"Output: {result.stdout}")
                 return True
             else:
-                logger.error(
-                    f"Command '{name}' failed with return code {result.returncode}"
-                )
+                logger.error(f"Command '{name}' failed with return code {result.returncode}")
                 if result.stderr:
                     logger.error(f"Error: {result.stderr}")
                 return False
@@ -225,9 +221,7 @@ class CommandStorage:
                     logger.info(f"Output: {result.stdout}")
                 return True
             else:
-                logger.error(
-                    f"Script '{name}' failed with return code {result.returncode}"
-                )
+                logger.error(f"Script '{name}' failed with return code {result.returncode}")
                 if result.stderr:
                     logger.error(f"Error: {result.stderr}")
                 return False

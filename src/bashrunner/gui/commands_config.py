@@ -17,7 +17,6 @@ from PySide6.QtWidgets import (  # type: ignore
     QListWidgetItem,
     QMessageBox,
     QPushButton,
-    QSplitter,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -25,6 +24,42 @@ from PySide6.QtWidgets import (  # type: ignore
 
 from bashrunner.core.command_storage import Command
 from bashrunner.core.storage_instance import command_storage
+
+
+class AddEditCommandDialog(QDialog):
+    """Dialog for adding or editing a command."""
+
+    def __init__(self, command: Optional[Command] = None, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self.setWindowTitle("Add Command" if command is None else "Edit Command")
+        self.setMinimumSize(600, 500)
+
+        layout = QVBoxLayout(self)
+
+        # Command edit widget
+        self.edit_widget = CommandEditWidget(command, self)
+        layout.addWidget(self.edit_widget)
+
+        # Dialog buttons
+        buttons_layout = QHBoxLayout()
+        buttons_layout.addStretch()
+
+        self.save_button = QPushButton("Save")
+        self.save_button.clicked.connect(self.accept)
+        self.save_button.setDefault(True)
+        buttons_layout.addWidget(self.save_button)
+
+        self.cancel_button = QPushButton("Cancel")
+        self.cancel_button.clicked.connect(self.reject)
+        buttons_layout.addWidget(self.cancel_button)
+
+        layout.addLayout(buttons_layout)
+
+        logger.info(f"{'Add' if command is None else 'Edit'} command dialog initialized")
+
+    def get_command(self) -> Command:
+        """Get the command from the edit widget."""
+        return self.edit_widget.get_command()
 
 
 class CommandEditWidget(QWidget):
@@ -118,9 +153,7 @@ class CommandEditWidget(QWidget):
 
     def _browse_file(self) -> None:
         """Browse for script file."""
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "Select Script File", "", "All Files (*)"
-        )
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select Script File", "", "All Files (*)")
         if file_path:
             self.file_path_edit.setText(file_path)
 
@@ -149,20 +182,17 @@ class CommandsConfigDialog(QDialog):
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.setWindowTitle("Commands Configuration")
-        self.setMinimumSize(800, 600)
-        self._is_new_command = False  # Track if current command is new
+        self.setMinimumSize(500, 600)
 
         layout = QVBoxLayout(self)
-
-        # Splitter for list and editor
-        self.splitter = QSplitter(Qt.Orientation.Horizontal)
 
         # Commands list
         list_group = QGroupBox("Commands")
         list_layout = QVBoxLayout(list_group)
 
         self.commands_list = QListWidget()
-        self.commands_list.currentRowChanged.connect(self._on_command_selected)
+        self.commands_list.itemDoubleClicked.connect(self._edit_command)
+        self.commands_list.currentRowChanged.connect(self._update_button_states)
         list_layout.addWidget(self.commands_list)
 
         # List controls
@@ -171,6 +201,10 @@ class CommandsConfigDialog(QDialog):
         self.add_button = QPushButton("Add")
         self.add_button.clicked.connect(self._add_command)
         list_controls.addWidget(self.add_button)
+
+        self.edit_button = QPushButton("Edit")
+        self.edit_button.clicked.connect(self._edit_command)
+        list_controls.addWidget(self.edit_button)
 
         self.delete_button = QPushButton("Delete")
         self.delete_button.clicked.connect(self._delete_command)
@@ -187,23 +221,11 @@ class CommandsConfigDialog(QDialog):
         list_controls.addStretch()
         list_layout.addLayout(list_controls)
 
-        self.splitter.addWidget(list_group)
-
-        # Command editor
-        self.edit_widget = CommandEditWidget()
-        self.splitter.addWidget(self.edit_widget)
-
-        # Set splitter proportions
-        self.splitter.setSizes([300, 500])
-
-        layout.addWidget(self.splitter)
+        layout.addWidget(list_group)
 
         # Dialog buttons
         buttons_layout = QHBoxLayout()
-
-        self.save_button = QPushButton("Save")
-        self.save_button.clicked.connect(self._save_command)
-        buttons_layout.addWidget(self.save_button)
+        buttons_layout.addStretch()
 
         self.close_button = QPushButton("Close")
         self.close_button.clicked.connect(self.accept)
@@ -230,81 +252,94 @@ class CommandsConfigDialog(QDialog):
         if commands:
             self.commands_list.setCurrentRow(0)
 
-    def _on_command_selected(self, row: int) -> None:
-        """Handle command selection."""
-        if row >= 0:
-            commands = command_storage.get_commands()
-            if row < len(commands):
-                command = commands[row]
-                self._is_new_command = False
-                # Create new edit widget and replace the old one
-                new_edit_widget = CommandEditWidget(command, self)
-                old_widget = self.splitter.widget(1)
-                self.splitter.replaceWidget(1, new_edit_widget)
-                if old_widget:
-                    old_widget.deleteLater()
-                self.edit_widget = new_edit_widget
-
-        self._update_button_states()
-
     def _update_button_states(self) -> None:
         """Update button enabled states."""
         current_row = self.commands_list.currentRow()
         has_selection = current_row >= 0
         command_count = self.commands_list.count()
 
-        self.delete_button.setEnabled(has_selection and not self._is_new_command)
-        self.move_up_button.setEnabled(
-            has_selection and current_row > 0 and not self._is_new_command
-        )
-        self.move_down_button.setEnabled(
-            has_selection and current_row < command_count - 1 and not self._is_new_command
-        )
-        self.save_button.setEnabled(has_selection or self._is_new_command)
+        self.edit_button.setEnabled(has_selection)
+        self.delete_button.setEnabled(has_selection)
+        self.move_up_button.setEnabled(has_selection and current_row > 0)
+        self.move_down_button.setEnabled(has_selection and current_row < command_count - 1)
 
     def _add_command(self) -> None:
         """Add a new command."""
-        # Create a new empty command in the edit widget
-        new_edit_widget = CommandEditWidget(Command("", "single", "", ""), self)
-        old_widget = self.splitter.widget(1)
-        self.splitter.replaceWidget(1, new_edit_widget)
-        if old_widget:
-            old_widget.deleteLater()
-        self.edit_widget = new_edit_widget
+        dialog = AddEditCommandDialog(None, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            command = dialog.get_command()
 
-        # Mark as new command
-        self._is_new_command = True
+            # Validate
+            if not command.name.strip():
+                QMessageBox.warning(self, "Invalid Command", "Command name is required.")
+                return
 
-        # Deselect any item in the list
-        self.commands_list.setCurrentRow(-1)
+            if not command.content.strip():
+                QMessageBox.warning(self, "Invalid Command", "Command content is required.")
+                return
 
-        # Update button states
-        self._update_button_states()
+            # Add to storage
+            command_storage.add_command(command)
+            self._load_commands()
+            self.commands_updated.emit()
 
-        logger.info("Adding new command")
+            logger.info(f"Added new command: {command.name}")
+
+    def _edit_command(self) -> None:
+        """Edit the selected command."""
+        current_row = self.commands_list.currentRow()
+        if current_row < 0:
+            return
+
+        commands = command_storage.get_commands()
+        if current_row >= len(commands):
+            return
+
+        command = commands[current_row]
+        dialog = AddEditCommandDialog(command, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            edited_command = dialog.get_command()
+
+            # Validate
+            if not edited_command.name.strip():
+                QMessageBox.warning(self, "Invalid Command", "Command name is required.")
+                return
+
+            if not edited_command.content.strip():
+                QMessageBox.warning(self, "Invalid Command", "Command content is required.")
+                return
+
+            # Update in storage
+            command_storage.update_command(current_row, edited_command)
+            self._load_commands()
+            self.commands_updated.emit()
+
+            logger.info(f"Updated command: {edited_command.name}")
 
     def _delete_command(self) -> None:
         """Delete the selected command."""
         current_row = self.commands_list.currentRow()
-        if current_row >= 0 and not self._is_new_command:
-            reply = QMessageBox.question(
-                self,
-                "Delete Command",
-                "Are you sure you want to delete this command?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
+        if current_row < 0:
+            return
 
-            if reply == QMessageBox.StandardButton.Yes:
-                if command_storage.delete_command(current_row):
-                    self._load_commands()
-                    self.commands_updated.emit()
-                    logger.info("Deleted command")
+        reply = QMessageBox.question(
+            self,
+            "Delete Command",
+            "Are you sure you want to delete this command?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            if command_storage.delete_command(current_row):
+                self._load_commands()
+                self.commands_updated.emit()
+                logger.info("Deleted command")
 
     def _move_command_up(self) -> None:
         """Move the selected command up."""
         current_row = self.commands_list.currentRow()
-        if current_row > 0 and not self._is_new_command:
+        if current_row > 0:
             if command_storage.move_command(current_row, current_row - 1):
                 self._load_commands()
                 self.commands_list.setCurrentRow(current_row - 1)
@@ -313,43 +348,8 @@ class CommandsConfigDialog(QDialog):
     def _move_command_down(self) -> None:
         """Move the selected command down."""
         current_row = self.commands_list.currentRow()
-        if current_row < self.commands_list.count() - 1 and not self._is_new_command:
+        if current_row < self.commands_list.count() - 1:
             if command_storage.move_command(current_row, current_row + 1):
                 self._load_commands()
                 self.commands_list.setCurrentRow(current_row + 1)
                 self.commands_updated.emit()
-
-    def _save_command(self) -> None:
-        """Save the current command."""
-        # Get the edited command
-        edited_command = self.edit_widget.get_command()
-
-        # Validate
-        if not edited_command.name.strip():
-            QMessageBox.warning(self, "Invalid Command", "Command name is required.")
-            return
-
-        if not edited_command.content.strip():
-            QMessageBox.warning(self, "Invalid Command", "Command content is required.")
-            return
-
-        if self._is_new_command:
-            # Add new command to storage
-            command_storage.add_command(edited_command)
-            self._is_new_command = False
-            logger.info(f"Added new command: {edited_command.name}")
-        else:
-            # Update existing command
-            current_row = self.commands_list.currentRow()
-            if current_row >= 0:
-                command_storage.update_command(current_row, edited_command)
-                logger.info(f"Updated command: {edited_command.name}")
-
-        # Reload the list and emit signal
-        self._load_commands()
-        self.commands_updated.emit()
-
-        # Show success message
-        QMessageBox.information(
-            self, "Success", f"Command '{edited_command.name}' saved successfully."
-        )

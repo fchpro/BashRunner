@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 from PySide6.QtCore import Qt  # type: ignore
-from PySide6.QtWidgets import QMessageBox  # type: ignore
+from PySide6.QtWidgets import QDialog, QMessageBox  # type: ignore
 from pytestqt.qtbot import QtBot  # type: ignore
 
 from bashrunner.core.command_storage import Command, CommandStorage
@@ -25,6 +25,7 @@ def test_add_and_save_new_command_workflow(qtbot: QtBot, temp_storage, monkeypat
     """Test the complete workflow of adding and saving a new command."""
     # Monkey patch the storage in the dialog module
     import bashrunner.gui.commands_config as config_module
+    from bashrunner.gui.commands_config import AddEditCommandDialog
 
     monkeypatch.setattr(config_module, "command_storage", temp_storage)
 
@@ -34,22 +35,22 @@ def test_add_and_save_new_command_workflow(qtbot: QtBot, temp_storage, monkeypat
     # Initial state - no commands
     assert dialog.commands_list.count() == 0
 
-    # Click Add button
-    qtbot.mouseClick(dialog.add_button, Qt.MouseButton.LeftButton)
+    # Mock the AddEditCommandDialog to return a command
+    class MockAddDialog(AddEditCommandDialog):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.edit_widget.name_edit.setText("Test Command")
+            self.edit_widget.content_edit.setPlainText("echo hello")
+            self.edit_widget.description_edit.setText("A test command")
 
-    # Should be in "new command" mode
-    assert dialog._is_new_command is True
+        def exec(self):
+            return QDialog.DialogCode.Accepted
 
-    # Fill in command details
-    dialog.edit_widget.name_edit.setText("Test Command")
-    dialog.edit_widget.content_edit.setPlainText("echo hello")
-    dialog.edit_widget.description_edit.setText("A test command")
+    # Patch the dialog creation
+    monkeypatch.setattr(config_module, "AddEditCommandDialog", MockAddDialog)
 
-    # Mock the success message box
-    monkeypatch.setattr(QMessageBox, "information", lambda *args: None)
-
-    # Click Save button
-    qtbot.mouseClick(dialog.save_button, Qt.MouseButton.LeftButton)
+    # Click Add button (this will trigger the mocked dialog)
+    dialog._add_command()
 
     # Command should be added to the list
     assert dialog.commands_list.count() == 1
@@ -70,6 +71,7 @@ def test_edit_existing_command_workflow(qtbot: QtBot, temp_storage, monkeypatch)
 
     # Monkey patch the storage
     import bashrunner.gui.commands_config as config_module
+    from bashrunner.gui.commands_config import AddEditCommandDialog
 
     monkeypatch.setattr(config_module, "command_storage", temp_storage)
 
@@ -82,15 +84,20 @@ def test_edit_existing_command_workflow(qtbot: QtBot, temp_storage, monkeypatch)
     # Select the command
     dialog.commands_list.setCurrentRow(0)
 
-    # Edit the command
-    dialog.edit_widget.name_edit.setText("Modified")
-    dialog.edit_widget.content_edit.setPlainText("echo modified")
+    # Mock the AddEditCommandDialog for editing
+    class MockEditDialog(AddEditCommandDialog):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.edit_widget.name_edit.setText("Modified")
+            self.edit_widget.content_edit.setPlainText("echo modified")
 
-    # Mock the success message box
-    monkeypatch.setattr(QMessageBox, "information", lambda *args: None)
+        def exec(self):
+            return QDialog.DialogCode.Accepted
 
-    # Save
-    qtbot.mouseClick(dialog.save_button, Qt.MouseButton.LeftButton)
+    monkeypatch.setattr(config_module, "AddEditCommandDialog", MockEditDialog)
+
+    # Trigger edit
+    dialog._edit_command()
 
     # Verify changes
     commands = temp_storage.get_commands()
@@ -122,7 +129,9 @@ def test_delete_command_workflow(qtbot: QtBot, temp_storage, monkeypatch):
     dialog.commands_list.setCurrentRow(0)
 
     # Mock the confirmation dialog to return Yes
-    monkeypatch.setattr(QMessageBox, "question", lambda *args, **kwargs: QMessageBox.StandardButton.Yes)
+    monkeypatch.setattr(
+        QMessageBox, "question", lambda *args, **kwargs: QMessageBox.StandardButton.Yes
+    )
 
     # Delete
     qtbot.mouseClick(dialog.delete_button, Qt.MouseButton.LeftButton)
@@ -222,24 +231,32 @@ def test_validation_empty_name(qtbot: QtBot, temp_storage, monkeypatch):
     """Test validation when saving a command with empty name."""
     # Monkey patch the storage
     import bashrunner.gui.commands_config as config_module
+    from bashrunner.gui.commands_config import AddEditCommandDialog
 
     monkeypatch.setattr(config_module, "command_storage", temp_storage)
 
     dialog = CommandsConfigDialog()
     qtbot.addWidget(dialog)
 
-    # Click Add
-    qtbot.mouseClick(dialog.add_button, Qt.MouseButton.LeftButton)
+    # Mock the AddEditCommandDialog with empty name
+    class MockAddDialog(AddEditCommandDialog):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            # Leave name empty, but fill content
+            self.edit_widget.name_edit.setText("")
+            self.edit_widget.content_edit.setPlainText("echo test")
 
-    # Leave name empty, but fill content
-    dialog.edit_widget.content_edit.setPlainText("echo test")
+        def exec(self):
+            return QDialog.DialogCode.Accepted
+
+    monkeypatch.setattr(config_module, "AddEditCommandDialog", MockAddDialog)
 
     # Mock warning dialog
     warning_called = []
     monkeypatch.setattr(QMessageBox, "warning", lambda *args: warning_called.append(True))
 
-    # Try to save
-    qtbot.mouseClick(dialog.save_button, Qt.MouseButton.LeftButton)
+    # Try to add command
+    dialog._add_command()
 
     # Should show warning
     assert len(warning_called) > 0
@@ -252,24 +269,32 @@ def test_validation_empty_content(qtbot: QtBot, temp_storage, monkeypatch):
     """Test validation when saving a command with empty content."""
     # Monkey patch the storage
     import bashrunner.gui.commands_config as config_module
+    from bashrunner.gui.commands_config import AddEditCommandDialog
 
     monkeypatch.setattr(config_module, "command_storage", temp_storage)
 
     dialog = CommandsConfigDialog()
     qtbot.addWidget(dialog)
 
-    # Click Add
-    qtbot.mouseClick(dialog.add_button, Qt.MouseButton.LeftButton)
+    # Mock the AddEditCommandDialog with empty content
+    class MockAddDialog(AddEditCommandDialog):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            # Fill name but leave content empty
+            self.edit_widget.name_edit.setText("Test")
+            self.edit_widget.content_edit.setPlainText("")
 
-    # Fill name but leave content empty
-    dialog.edit_widget.name_edit.setText("Test")
+        def exec(self):
+            return QDialog.DialogCode.Accepted
+
+    monkeypatch.setattr(config_module, "AddEditCommandDialog", MockAddDialog)
 
     # Mock warning dialog
     warning_called = []
     monkeypatch.setattr(QMessageBox, "warning", lambda *args: warning_called.append(True))
 
-    # Try to save
-    qtbot.mouseClick(dialog.save_button, Qt.MouseButton.LeftButton)
+    # Try to add command
+    dialog._add_command()
 
     # Should show warning
     assert len(warning_called) > 0
@@ -282,25 +307,29 @@ def test_multi_command_type_workflow(qtbot: QtBot, temp_storage, monkeypatch):
     """Test creating a multi-command type."""
     # Monkey patch the storage
     import bashrunner.gui.commands_config as config_module
+    from bashrunner.gui.commands_config import AddEditCommandDialog
 
     monkeypatch.setattr(config_module, "command_storage", temp_storage)
 
     dialog = CommandsConfigDialog()
     qtbot.addWidget(dialog)
 
-    # Add new command
-    qtbot.mouseClick(dialog.add_button, Qt.MouseButton.LeftButton)
+    # Mock the AddEditCommandDialog with multi-command type
+    class MockAddDialog(AddEditCommandDialog):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            # Set to multi command type
+            self.edit_widget.type_combo.setCurrentText("Multiple Commands")
+            self.edit_widget.name_edit.setText("Multi")
+            self.edit_widget.content_edit.setPlainText("echo line1\necho line2\necho line3")
 
-    # Set to multi command type
-    dialog.edit_widget.type_combo.setCurrentText("Multiple Commands")
-    dialog.edit_widget.name_edit.setText("Multi")
-    dialog.edit_widget.content_edit.setPlainText("echo line1\necho line2\necho line3")
+        def exec(self):
+            return QDialog.DialogCode.Accepted
 
-    # Mock success dialog
-    monkeypatch.setattr(QMessageBox, "information", lambda *args: None)
+    monkeypatch.setattr(config_module, "AddEditCommandDialog", MockAddDialog)
 
-    # Save
-    qtbot.mouseClick(dialog.save_button, Qt.MouseButton.LeftButton)
+    # Add command
+    dialog._add_command()
 
     # Verify
     commands = temp_storage.get_commands()

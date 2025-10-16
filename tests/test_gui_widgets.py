@@ -3,7 +3,11 @@
 from pytestqt.qtbot import QtBot  # type: ignore
 
 from bashrunner.core.command_storage import Command
-from bashrunner.gui.commands_config import CommandEditWidget, CommandsConfigDialog
+from bashrunner.gui.commands_config import (
+    AddEditCommandDialog,
+    CommandEditWidget,
+    CommandsConfigDialog,
+)
 from bashrunner.gui.main_window import CommandButton, MainWindow
 from bashrunner.gui.settings_dialog import SettingsDialog
 
@@ -104,12 +108,12 @@ def test_commands_config_dialog_initialization(qtbot: QtBot):
 
     assert dialog.windowTitle() == "Commands Configuration"
     assert dialog.commands_list is not None
-    assert dialog.edit_widget is not None
     assert dialog.add_button is not None
+    assert dialog.edit_button is not None
     assert dialog.delete_button is not None
     assert dialog.move_up_button is not None
     assert dialog.move_down_button is not None
-    assert dialog.save_button is not None
+    assert dialog.close_button is not None
 
 
 def test_commands_config_dialog_button_states(qtbot: QtBot):
@@ -121,9 +125,47 @@ def test_commands_config_dialog_button_states(qtbot: QtBot):
     dialog.commands_list.setCurrentRow(-1)
     dialog._update_button_states()
 
+    assert not dialog.edit_button.isEnabled()
     assert not dialog.delete_button.isEnabled()
     assert not dialog.move_up_button.isEnabled()
     assert not dialog.move_down_button.isEnabled()
+
+
+def test_add_edit_command_dialog_initialization_add(qtbot: QtBot):
+    """Test AddEditCommandDialog initialization for adding."""
+    dialog = AddEditCommandDialog()
+    qtbot.addWidget(dialog)
+
+    assert dialog.windowTitle() == "Add Command"
+    assert dialog.edit_widget is not None
+    assert dialog.save_button is not None
+    assert dialog.cancel_button is not None
+
+
+def test_add_edit_command_dialog_initialization_edit(qtbot: QtBot):
+    """Test AddEditCommandDialog initialization for editing."""
+    cmd = Command("Test", "single", "echo hello", "Description")
+    dialog = AddEditCommandDialog(cmd)
+    qtbot.addWidget(dialog)
+
+    assert dialog.windowTitle() == "Edit Command"
+    assert dialog.edit_widget is not None
+    assert dialog.edit_widget.name_edit.text() == "Test"
+
+
+def test_add_edit_command_dialog_get_command(qtbot: QtBot):
+    """Test getting command from AddEditCommandDialog."""
+    dialog = AddEditCommandDialog()
+    qtbot.addWidget(dialog)
+
+    dialog.edit_widget.name_edit.setText("TestCmd")
+    dialog.edit_widget.content_edit.setPlainText("echo test")
+    dialog.edit_widget.description_edit.setText("Test description")
+
+    cmd = dialog.get_command()
+    assert cmd.name == "TestCmd"
+    assert cmd.content == "echo test"
+    assert cmd.description == "Test description"
 
 
 def test_settings_dialog_initialization(qtbot: QtBot):
@@ -157,4 +199,3 @@ def test_settings_dialog_default_values(qtbot: QtBot):
     settings = dialog.get_settings()
     assert settings["auto_refresh"] is True
     assert settings["grid_columns"] == 4
-

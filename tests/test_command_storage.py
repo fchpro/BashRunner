@@ -252,4 +252,3 @@ def test_multiple_add_operations(storage):
     commands = storage.get_commands()
     assert len(commands) == 5
     assert all(cmd.name == f"Test{i}" for i, cmd in enumerate(commands))
-
