@@ -30,7 +30,7 @@ class CommandButton(QPushButton):
         self.clicked.connect(self._execute_command)
         self.setToolTip(command.description or f"Execute: {command.content[:100]}...")
         self.setMinimumHeight(60)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
     def _execute_command(self) -> None:
         """Execute the associated command."""
@@ -60,8 +60,8 @@ class MainWindow(QMainWindow):
         # Scroll area for buttons
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
         # Container for button grid
         self.buttons_container = QWidget()
@@ -108,7 +108,7 @@ class MainWindow(QMainWindow):
         if not commands:
             # Show empty state
             empty_label = QLabel("No commands configured.\nClick 'Commands' to add some.")
-            empty_label.setAlignment(Qt.AlignCenter)
+            empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             empty_label.setStyleSheet("font-size: 16px; color: #666; padding: 40px;")
             self.buttons_layout.addWidget(empty_label, 0, 0)
         else:

@@ -35,7 +35,7 @@ def test_add_and_save_new_command_workflow(qtbot: QtBot, temp_storage, monkeypat
     assert dialog.commands_list.count() == 0
 
     # Click Add button
-    qtbot.mouseClick(dialog.add_button, Qt.LeftButton)
+    qtbot.mouseClick(dialog.add_button, Qt.MouseButton.LeftButton)
 
     # Should be in "new command" mode
     assert dialog._is_new_command is True
@@ -49,7 +49,7 @@ def test_add_and_save_new_command_workflow(qtbot: QtBot, temp_storage, monkeypat
     monkeypatch.setattr(QMessageBox, "information", lambda *args: None)
 
     # Click Save button
-    qtbot.mouseClick(dialog.save_button, Qt.LeftButton)
+    qtbot.mouseClick(dialog.save_button, Qt.MouseButton.LeftButton)
 
     # Command should be added to the list
     assert dialog.commands_list.count() == 1
@@ -90,7 +90,7 @@ def test_edit_existing_command_workflow(qtbot: QtBot, temp_storage, monkeypatch)
     monkeypatch.setattr(QMessageBox, "information", lambda *args: None)
 
     # Save
-    qtbot.mouseClick(dialog.save_button, Qt.LeftButton)
+    qtbot.mouseClick(dialog.save_button, Qt.MouseButton.LeftButton)
 
     # Verify changes
     commands = temp_storage.get_commands()
@@ -122,10 +122,10 @@ def test_delete_command_workflow(qtbot: QtBot, temp_storage, monkeypatch):
     dialog.commands_list.setCurrentRow(0)
 
     # Mock the confirmation dialog to return Yes
-    monkeypatch.setattr(QMessageBox, "question", lambda *args, **kwargs: QMessageBox.Yes)
+    monkeypatch.setattr(QMessageBox, "question", lambda *args, **kwargs: QMessageBox.StandardButton.Yes)
 
     # Delete
-    qtbot.mouseClick(dialog.delete_button, Qt.LeftButton)
+    qtbot.mouseClick(dialog.delete_button, Qt.MouseButton.LeftButton)
 
     # Should have one command left
     assert dialog.commands_list.count() == 1
@@ -156,7 +156,7 @@ def test_move_command_up_workflow(qtbot: QtBot, temp_storage, monkeypatch):
     dialog.commands_list.setCurrentRow(1)
 
     # Move up
-    qtbot.mouseClick(dialog.move_up_button, Qt.LeftButton)
+    qtbot.mouseClick(dialog.move_up_button, Qt.MouseButton.LeftButton)
 
     # Order should be reversed
     assert dialog.commands_list.item(0).text() == "Second"
@@ -187,7 +187,7 @@ def test_move_command_down_workflow(qtbot: QtBot, temp_storage, monkeypatch):
     dialog.commands_list.setCurrentRow(0)
 
     # Move down
-    qtbot.mouseClick(dialog.move_down_button, Qt.LeftButton)
+    qtbot.mouseClick(dialog.move_down_button, Qt.MouseButton.LeftButton)
 
     # Order should be reversed
     assert dialog.commands_list.item(0).text() == "Second"
@@ -229,7 +229,7 @@ def test_validation_empty_name(qtbot: QtBot, temp_storage, monkeypatch):
     qtbot.addWidget(dialog)
 
     # Click Add
-    qtbot.mouseClick(dialog.add_button, Qt.LeftButton)
+    qtbot.mouseClick(dialog.add_button, Qt.MouseButton.LeftButton)
 
     # Leave name empty, but fill content
     dialog.edit_widget.content_edit.setPlainText("echo test")
@@ -239,7 +239,7 @@ def test_validation_empty_name(qtbot: QtBot, temp_storage, monkeypatch):
     monkeypatch.setattr(QMessageBox, "warning", lambda *args: warning_called.append(True))
 
     # Try to save
-    qtbot.mouseClick(dialog.save_button, Qt.LeftButton)
+    qtbot.mouseClick(dialog.save_button, Qt.MouseButton.LeftButton)
 
     # Should show warning
     assert len(warning_called) > 0
@@ -259,7 +259,7 @@ def test_validation_empty_content(qtbot: QtBot, temp_storage, monkeypatch):
     qtbot.addWidget(dialog)
 
     # Click Add
-    qtbot.mouseClick(dialog.add_button, Qt.LeftButton)
+    qtbot.mouseClick(dialog.add_button, Qt.MouseButton.LeftButton)
 
     # Fill name but leave content empty
     dialog.edit_widget.name_edit.setText("Test")
@@ -269,7 +269,7 @@ def test_validation_empty_content(qtbot: QtBot, temp_storage, monkeypatch):
     monkeypatch.setattr(QMessageBox, "warning", lambda *args: warning_called.append(True))
 
     # Try to save
-    qtbot.mouseClick(dialog.save_button, Qt.LeftButton)
+    qtbot.mouseClick(dialog.save_button, Qt.MouseButton.LeftButton)
 
     # Should show warning
     assert len(warning_called) > 0
@@ -289,7 +289,7 @@ def test_multi_command_type_workflow(qtbot: QtBot, temp_storage, monkeypatch):
     qtbot.addWidget(dialog)
 
     # Add new command
-    qtbot.mouseClick(dialog.add_button, Qt.LeftButton)
+    qtbot.mouseClick(dialog.add_button, Qt.MouseButton.LeftButton)
 
     # Set to multi command type
     dialog.edit_widget.type_combo.setCurrentText("Multiple Commands")
@@ -300,7 +300,7 @@ def test_multi_command_type_workflow(qtbot: QtBot, temp_storage, monkeypatch):
     monkeypatch.setattr(QMessageBox, "information", lambda *args: None)
 
     # Save
-    qtbot.mouseClick(dialog.save_button, Qt.LeftButton)
+    qtbot.mouseClick(dialog.save_button, Qt.MouseButton.LeftButton)
 
     # Verify
     commands = temp_storage.get_commands()

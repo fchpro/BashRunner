@@ -155,7 +155,7 @@ class CommandsConfigDialog(QDialog):
         layout = QVBoxLayout(self)
 
         # Splitter for list and editor
-        self.splitter = QSplitter(Qt.Horizontal)
+        self.splitter = QSplitter(Qt.Orientation.Horizontal)
 
         # Commands list
         list_group = QGroupBox("Commands")
@@ -224,7 +224,7 @@ class CommandsConfigDialog(QDialog):
 
         for i, command in enumerate(commands):
             item = QListWidgetItem(command.name)
-            item.setData(Qt.UserRole, i)  # Store the index
+            item.setData(Qt.ItemDataRole.UserRole, i)  # Store the index
             self.commands_list.addItem(item)
 
         if commands:
@@ -291,11 +291,11 @@ class CommandsConfigDialog(QDialog):
                 self,
                 "Delete Command",
                 "Are you sure you want to delete this command?",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
             )
 
-            if reply == QMessageBox.Yes:
+            if reply == QMessageBox.StandardButton.Yes:
                 if command_storage.delete_command(current_row):
                     self._load_commands()
                     self.commands_updated.emit()
