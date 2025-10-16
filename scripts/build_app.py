@@ -44,20 +44,26 @@ def build_app():
     # PyInstaller command
     cmd = [
         "pyinstaller",
-        "--name", APP_NAME,
+        "--name",
+        APP_NAME,
         "--windowed",  # No console window (GUI app)
         "--onedir",  # Create a folder with all dependencies
         "--clean",  # Clean cache before building
         # macOS specific options
-        "--osx-bundle-identifier", "com.bashrunner.app",
+        "--osx-bundle-identifier",
+        "com.bashrunner.app",
         # Add src to Python path
         f"--paths={SRC_DIR}",
         # Hidden imports for PySide6
-        "--hidden-import", "PySide6.QtCore",
-        "--hidden-import", "PySide6.QtGui",
-        "--hidden-import", "PySide6.QtWidgets",
+        "--hidden-import",
+        "PySide6.QtCore",
+        "--hidden-import",
+        "PySide6.QtGui",
+        "--hidden-import",
+        "PySide6.QtWidgets",
         # Hidden imports for loguru
-        "--hidden-import", "loguru",
+        "--hidden-import",
+        "loguru",
         # Entry point
         str(ENTRY_POINT),
     ]
@@ -69,7 +75,7 @@ def build_app():
         logger.error("Build failed!")
         sys.exit(1)
 
-    logger.success(f"Build completed successfully!")
+    logger.success("Build completed successfully!")
     logger.info(f"Application bundle: {DIST_DIR / APP_NAME}")
 
 
@@ -93,7 +99,7 @@ def main():
 
     # Display final info
     logger.info("\n" + "=" * 60)
-    logger.info(f"Build complete! Your app is ready:")
+    logger.info("Build complete! Your app is ready:")
     logger.info(f"  Location: {DIST_DIR / APP_NAME}")
     if sys.platform == "darwin":
         logger.info(f"  macOS App: {DIST_DIR / f'{APP_NAME}.app'}")
@@ -102,4 +108,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

@@ -164,13 +164,13 @@ class CommandStorage:
 
     def _execute_single_command(self, command: str, name: str) -> bool:
         """Execute a single shell command.
-        
+
         Uses non-blocking execution to allow GUI applications and long-running
         processes to launch properly.
         """
         try:
             logger.info(f"Executing single command '{name}': {command}")
-            
+
             # Use Popen for non-blocking execution to allow GUI apps to launch
             process = subprocess.Popen(
                 command,
@@ -178,9 +178,9 @@ class CommandStorage:
                 stdin=subprocess.DEVNULL,
                 stdout=None,  # Inherit stdout
                 stderr=None,  # Inherit stderr
-                start_new_session=True  # Detach from parent process
+                start_new_session=True,  # Detach from parent process
             )
-            
+
             logger.info(f"Command '{name}' started with PID {process.pid}")
             return True
         except Exception as e:
@@ -189,7 +189,7 @@ class CommandStorage:
 
     def _execute_multi_commands(self, commands_text: str, name: str) -> bool:
         """Execute multiple shell commands separated by newlines.
-        
+
         Commands are combined and executed as a single shell script to properly
         handle directory changes, environment setup, and GUI application launches.
         """
@@ -198,13 +198,13 @@ class CommandStorage:
             if not commands:
                 logger.warning(f"No commands to execute in '{name}'")
                 return False
-            
+
             # Combine commands into a single shell script with proper error handling
             # Using newlines preserves command structure (cd, etc.)
             combined_script = "\n".join(commands)
-            
+
             logger.info(f"Executing multicommand '{name}' with {len(commands)} command(s)")
-            
+
             # Use Popen for non-blocking execution to allow GUI apps to launch
             # Don't capture output so apps can interact with terminal/display properly
             process = subprocess.Popen(
@@ -213,9 +213,9 @@ class CommandStorage:
                 stdin=subprocess.DEVNULL,
                 stdout=None,  # Inherit stdout
                 stderr=None,  # Inherit stderr
-                start_new_session=True  # Detach from parent process
+                start_new_session=True,  # Detach from parent process
             )
-            
+
             logger.info(f"Multicommand '{name}' started with PID {process.pid}")
             return True
         except Exception as e:
@@ -224,7 +224,7 @@ class CommandStorage:
 
     def _execute_script(self, script_path: str, name: str) -> bool:
         """Execute a script file.
-        
+
         Uses non-blocking execution to allow scripts that launch GUI applications
         or long-running processes to work properly.
         """
@@ -235,7 +235,7 @@ class CommandStorage:
                 return False
 
             logger.info(f"Executing script '{name}': {script_path}")
-            
+
             # Use Popen for non-blocking execution
             process = subprocess.Popen(
                 [str(script_file)],
@@ -243,9 +243,9 @@ class CommandStorage:
                 stdin=subprocess.DEVNULL,
                 stdout=None,  # Inherit stdout
                 stderr=None,  # Inherit stderr
-                start_new_session=True  # Detach from parent process
+                start_new_session=True,  # Detach from parent process
             )
-            
+
             logger.info(f"Script '{name}' started with PID {process.pid}")
             return True
         except Exception as e:

@@ -214,7 +214,7 @@ def test_execute_multi_commands(storage):
 
 def test_execute_failing_command(storage):
     """Test that commands launch successfully even if they eventually fail.
-    
+
     With non-blocking execution, we can't immediately detect if a command fails.
     The return value indicates whether the process launched, not whether it succeeded.
     """
