@@ -213,12 +213,17 @@ def test_execute_multi_commands(storage):
 
 
 def test_execute_failing_command(storage):
-    """Test executing a command that fails."""
+    """Test that commands launch successfully even if they eventually fail.
+    
+    With non-blocking execution, we can't immediately detect if a command fails.
+    The return value indicates whether the process launched, not whether it succeeded.
+    """
     cmd = Command("Fail", "single", "false", "")  # false command always fails
     storage.add_command(cmd)
 
     result = storage.execute_command(0)
-    assert result is False
+    # With non-blocking execution, this returns True if the process launched
+    assert result is True
 
 
 def test_execute_nonexistent_script(storage):

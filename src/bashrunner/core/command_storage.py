@@ -163,68 +163,91 @@ class CommandStorage:
             return False
 
     def _execute_single_command(self, command: str, name: str) -> bool:
-        """Execute a single shell command."""
+        """Execute a single shell command.
+        
+        Uses non-blocking execution to allow GUI applications and long-running
+        processes to launch properly.
+        """
         try:
-            result = subprocess.run(
-                command, shell=True, capture_output=True, text=True, check=False
+            logger.info(f"Executing single command '{name}': {command}")
+            
+            # Use Popen for non-blocking execution to allow GUI apps to launch
+            process = subprocess.Popen(
+                command,
+                shell=True,
+                stdin=subprocess.DEVNULL,
+                stdout=None,  # Inherit stdout
+                stderr=None,  # Inherit stderr
+                start_new_session=True  # Detach from parent process
             )
-            if result.returncode == 0:
-                logger.info(f"Command '{name}' executed successfully")
-                if result.stdout:
-                    logger.info(f"Output: {result.stdout}")
-                return True
-            else:
-                logger.error(f"Command '{name}' failed with return code {result.returncode}")
-                if result.stderr:
-                    logger.error(f"Error: {result.stderr}")
-                return False
+            
+            logger.info(f"Command '{name}' started with PID {process.pid}")
+            return True
         except Exception as e:
             logger.error(f"Exception executing command '{name}': {e}")
             return False
 
     def _execute_multi_commands(self, commands_text: str, name: str) -> bool:
-        """Execute multiple shell commands separated by newlines."""
+        """Execute multiple shell commands separated by newlines.
+        
+        Commands are combined and executed as a single shell script to properly
+        handle directory changes, environment setup, and GUI application launches.
+        """
         try:
             commands = [cmd.strip() for cmd in commands_text.split("\n") if cmd.strip()]
-            for command in commands:
-                logger.info(f"Executing: {command}")
-                result = subprocess.run(
-                    command, shell=True, capture_output=True, text=True, check=False
-                )
-                if result.returncode != 0:
-                    logger.error(f"Command failed: {command}")
-                    if result.stderr:
-                        logger.error(f"Error: {result.stderr}")
-                    return False
-                if result.stdout:
-                    logger.info(f"Output: {result.stdout}")
-            logger.info(f"All commands in '{name}' executed successfully")
+            if not commands:
+                logger.warning(f"No commands to execute in '{name}'")
+                return False
+            
+            # Combine commands into a single shell script with proper error handling
+            # Using newlines preserves command structure (cd, etc.)
+            combined_script = "\n".join(commands)
+            
+            logger.info(f"Executing multicommand '{name}' with {len(commands)} command(s)")
+            
+            # Use Popen for non-blocking execution to allow GUI apps to launch
+            # Don't capture output so apps can interact with terminal/display properly
+            process = subprocess.Popen(
+                combined_script,
+                shell=True,
+                stdin=subprocess.DEVNULL,
+                stdout=None,  # Inherit stdout
+                stderr=None,  # Inherit stderr
+                start_new_session=True  # Detach from parent process
+            )
+            
+            logger.info(f"Multicommand '{name}' started with PID {process.pid}")
             return True
         except Exception as e:
             logger.error(f"Exception executing multi commands '{name}': {e}")
             return False
 
     def _execute_script(self, script_path: str, name: str) -> bool:
-        """Execute a script file."""
+        """Execute a script file.
+        
+        Uses non-blocking execution to allow scripts that launch GUI applications
+        or long-running processes to work properly.
+        """
         try:
             script_file = Path(script_path)
             if not script_file.exists():
                 logger.error(f"Script file does not exist: {script_path}")
                 return False
 
-            result = subprocess.run(
-                [str(script_file)], shell=True, capture_output=True, text=True, check=False
+            logger.info(f"Executing script '{name}': {script_path}")
+            
+            # Use Popen for non-blocking execution
+            process = subprocess.Popen(
+                [str(script_file)],
+                shell=True,
+                stdin=subprocess.DEVNULL,
+                stdout=None,  # Inherit stdout
+                stderr=None,  # Inherit stderr
+                start_new_session=True  # Detach from parent process
             )
-            if result.returncode == 0:
-                logger.info(f"Script '{name}' executed successfully")
-                if result.stdout:
-                    logger.info(f"Output: {result.stdout}")
-                return True
-            else:
-                logger.error(f"Script '{name}' failed with return code {result.returncode}")
-                if result.stderr:
-                    logger.error(f"Error: {result.stderr}")
-                return False
+            
+            logger.info(f"Script '{name}' started with PID {process.pid}")
+            return True
         except Exception as e:
             logger.error(f"Exception executing script '{name}': {e}")
             return False
