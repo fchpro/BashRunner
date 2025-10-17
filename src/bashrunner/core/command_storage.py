@@ -3,9 +3,10 @@
 import json
 import subprocess
 import sys
+import threading
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from loguru import logger
 
@@ -45,7 +46,17 @@ class CommandStorage:
         self.storage_path.mkdir(parents=True, exist_ok=True)
         self.commands_file = self.storage_path / "commands.json"
         self._commands: List[Command] = []
+        self._output_callback: Optional[Callable[[str], None]] = None
+        self._error_callback: Optional[Callable[[str], None]] = None
         self._load_commands()
+
+    def set_output_callback(self, callback: Optional[Callable[[str], None]]) -> None:
+        """Set callback for stdout output."""
+        self._output_callback = callback
+
+    def set_error_callback(self, callback: Optional[Callable[[str], None]]) -> None:
+        """Set callback for stderr output."""
+        self._error_callback = callback
 
     def _get_default_storage_path(self) -> Path:
         """Get the default storage path based on platform."""
@@ -162,29 +173,65 @@ class CommandStorage:
             logger.error(f"Failed to execute command '{command.name}': {e}")
             return False
 
+    def _read_stream(self, stream, callback: Optional[Callable[[str], None]]) -> None:
+        """Read from a stream and call callback for each line."""
+        if stream is None or callback is None:
+            return
+        try:
+            for line in iter(stream.readline, b""):
+                if line:
+                    text = line.decode("utf-8", errors="replace")
+                    callback(text)
+        except Exception as e:
+            logger.error(f"Error reading stream: {e}")
+        finally:
+            if stream:
+                stream.close()
+
     def _execute_single_command(self, command: str, name: str) -> bool:
         """Execute a single shell command.
 
-        Uses non-blocking execution to allow GUI applications and long-running
-        processes to launch properly.
+        Captures stdout and stderr, streaming to callbacks if set.
         """
         try:
             logger.info(f"Executing single command '{name}': {command}")
 
-            # Use Popen for non-blocking execution to allow GUI apps to launch
+            if self._output_callback:
+                self._output_callback(f"$ {command}\n")
+
+            # Use Popen to capture output
             process = subprocess.Popen(
                 command,
                 shell=True,
                 stdin=subprocess.DEVNULL,
-                stdout=None,  # Inherit stdout
-                stderr=None,  # Inherit stderr
-                start_new_session=True,  # Detach from parent process
+                stdout=subprocess.PIPE if self._output_callback else None,
+                stderr=subprocess.PIPE if self._error_callback else None,
+                start_new_session=True,
             )
+
+            # Start threads to read stdout and stderr
+            if self._output_callback and process.stdout:
+                stdout_thread = threading.Thread(
+                    target=self._read_stream,
+                    args=(process.stdout, self._output_callback),
+                    daemon=True,
+                )
+                stdout_thread.start()
+
+            if self._error_callback and process.stderr:
+                stderr_thread = threading.Thread(
+                    target=self._read_stream,
+                    args=(process.stderr, self._error_callback),
+                    daemon=True,
+                )
+                stderr_thread.start()
 
             logger.info(f"Command '{name}' started with PID {process.pid}")
             return True
         except Exception as e:
             logger.error(f"Exception executing command '{name}': {e}")
+            if self._error_callback:
+                self._error_callback(f"Error: {e}\n")
             return False
 
     def _execute_multi_commands(self, commands_text: str, name: str) -> bool:
@@ -205,21 +252,43 @@ class CommandStorage:
 
             logger.info(f"Executing multicommand '{name}' with {len(commands)} command(s)")
 
-            # Use Popen for non-blocking execution to allow GUI apps to launch
-            # Don't capture output so apps can interact with terminal/display properly
+            if self._output_callback:
+                for cmd in commands:
+                    self._output_callback(f"$ {cmd}\n")
+
+            # Use Popen to capture output
             process = subprocess.Popen(
                 combined_script,
                 shell=True,
                 stdin=subprocess.DEVNULL,
-                stdout=None,  # Inherit stdout
-                stderr=None,  # Inherit stderr
-                start_new_session=True,  # Detach from parent process
+                stdout=subprocess.PIPE if self._output_callback else None,
+                stderr=subprocess.PIPE if self._error_callback else None,
+                start_new_session=True,
             )
+
+            # Start threads to read stdout and stderr
+            if self._output_callback and process.stdout:
+                stdout_thread = threading.Thread(
+                    target=self._read_stream,
+                    args=(process.stdout, self._output_callback),
+                    daemon=True,
+                )
+                stdout_thread.start()
+
+            if self._error_callback and process.stderr:
+                stderr_thread = threading.Thread(
+                    target=self._read_stream,
+                    args=(process.stderr, self._error_callback),
+                    daemon=True,
+                )
+                stderr_thread.start()
 
             logger.info(f"Multicommand '{name}' started with PID {process.pid}")
             return True
         except Exception as e:
             logger.error(f"Exception executing multi commands '{name}': {e}")
+            if self._error_callback:
+                self._error_callback(f"Error: {e}\n")
             return False
 
     def _execute_script(self, script_path: str, name: str) -> bool:
@@ -232,24 +301,48 @@ class CommandStorage:
             script_file = Path(script_path)
             if not script_file.exists():
                 logger.error(f"Script file does not exist: {script_path}")
+                if self._error_callback:
+                    self._error_callback(f"Error: Script file does not exist: {script_path}\n")
                 return False
 
             logger.info(f"Executing script '{name}': {script_path}")
 
-            # Use Popen for non-blocking execution
+            if self._output_callback:
+                self._output_callback(f"$ {script_path}\n")
+
+            # Use Popen to capture output
             process = subprocess.Popen(
                 [str(script_file)],
                 shell=True,
                 stdin=subprocess.DEVNULL,
-                stdout=None,  # Inherit stdout
-                stderr=None,  # Inherit stderr
-                start_new_session=True,  # Detach from parent process
+                stdout=subprocess.PIPE if self._output_callback else None,
+                stderr=subprocess.PIPE if self._error_callback else None,
+                start_new_session=True,
             )
+
+            # Start threads to read stdout and stderr
+            if self._output_callback and process.stdout:
+                stdout_thread = threading.Thread(
+                    target=self._read_stream,
+                    args=(process.stdout, self._output_callback),
+                    daemon=True,
+                )
+                stdout_thread.start()
+
+            if self._error_callback and process.stderr:
+                stderr_thread = threading.Thread(
+                    target=self._read_stream,
+                    args=(process.stderr, self._error_callback),
+                    daemon=True,
+                )
+                stderr_thread.start()
 
             logger.info(f"Script '{name}' started with PID {process.pid}")
             return True
         except Exception as e:
             logger.error(f"Exception executing script '{name}': {e}")
+            if self._error_callback:
+                self._error_callback(f"Error: {e}\n")
             return False
 
 

@@ -8,6 +8,7 @@ from bashrunner.gui.commands_config import (
     CommandEditWidget,
     CommandsConfigDialog,
 )
+from bashrunner.gui.console_view import ConsoleView
 from bashrunner.gui.main_window import CommandButton, MainWindow
 from bashrunner.gui.settings_dialog import SettingsDialog
 
@@ -199,3 +200,83 @@ def test_settings_dialog_default_values(qtbot: QtBot):
     settings = dialog.get_settings()
     assert settings["auto_refresh"] is True
     assert settings["grid_columns"] == 4
+
+
+def test_console_view_initialization(qtbot: QtBot):
+    """Test ConsoleView initialization."""
+    console = ConsoleView()
+    qtbot.addWidget(console)
+
+    assert console.console_text is not None
+    assert console.console_text.isReadOnly()
+    assert console.console_text.toPlainText() == ""
+
+
+def test_console_view_append_output(qtbot: QtBot):
+    """Test appending output to ConsoleView."""
+    console = ConsoleView()
+    qtbot.addWidget(console)
+
+    console.append_output("Test output\n")
+    console.append_output("More output\n")
+
+    text = console.console_text.toPlainText()
+    assert "Test output" in text
+    assert "More output" in text
+
+
+def test_console_view_append_error(qtbot: QtBot):
+    """Test appending error to ConsoleView."""
+    console = ConsoleView()
+    qtbot.addWidget(console)
+
+    console.append_error("Error message\n")
+
+    # Check that text was added (HTML parsing makes exact match difficult)
+    assert len(console.console_text.toPlainText()) > 0
+
+
+def test_console_view_clear(qtbot: QtBot):
+    """Test clearing ConsoleView."""
+    console = ConsoleView()
+    qtbot.addWidget(console)
+
+    console.append_output("Test output\n")
+    assert len(console.console_text.toPlainText()) > 0
+
+    console.clear()
+    assert console.console_text.toPlainText() == ""
+
+
+def test_main_window_has_console_view(qtbot: QtBot):
+    """Test that MainWindow has console view."""
+    window = MainWindow()
+    qtbot.addWidget(window)
+
+    assert window.console_view is not None
+    assert window.stacked_widget is not None
+    assert window.main_tab_button is not None
+    assert window.console_tab_button is not None
+
+
+def test_main_window_switch_view(qtbot: QtBot):
+    """Test switching views in MainWindow."""
+    window = MainWindow()
+    qtbot.addWidget(window)
+
+    # Initially on main view
+    assert window.stacked_widget.currentIndex() == 0
+    assert window.main_tab_button.isChecked()
+    assert not window.console_tab_button.isChecked()
+
+    # Switch to console view
+    window._switch_view(1)
+    assert window.stacked_widget.currentIndex() == 1
+    assert not window.main_tab_button.isChecked()
+    assert window.console_tab_button.isChecked()
+
+    # Switch back to main view
+    window._switch_view(0)
+    assert window.stacked_widget.currentIndex() == 0
+    assert window.main_tab_button.isChecked()
+    assert not window.console_tab_button.isChecked()

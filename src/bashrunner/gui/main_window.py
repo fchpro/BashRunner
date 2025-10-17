@@ -3,7 +3,7 @@
 from typing import Optional
 
 from loguru import logger
-from PySide6.QtCore import Qt  # type: ignore
+from PySide6.QtCore import Qt, Signal, Slot  # type: ignore
 from PySide6.QtWidgets import (  # type: ignore
     QGridLayout,
     QHBoxLayout,
@@ -12,12 +12,14 @@ from PySide6.QtWidgets import (  # type: ignore
     QPushButton,
     QScrollArea,
     QSizePolicy,
+    QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
 
 from bashrunner.core.command_storage import Command
 from bashrunner.core.storage_instance import command_storage
+from bashrunner.gui.console_view import ConsoleView
 
 
 class CommandButton(QPushButton):
@@ -45,6 +47,9 @@ class CommandButton(QPushButton):
 class MainWindow(QMainWindow):
     """Main application window."""
 
+    output_signal = Signal(str)
+    error_signal = Signal(str)
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("BashRunner")
@@ -57,7 +62,58 @@ class MainWindow(QMainWindow):
         # Main layout
         layout = QVBoxLayout(central_widget)
 
-        # Scroll area for buttons
+        # Tab buttons at the top
+        tab_layout = QHBoxLayout()
+        tab_layout.setSpacing(0)
+        tab_layout.setContentsMargins(0, 0, 0, 10)
+
+        self.main_tab_button = QPushButton("Commands")
+        self.main_tab_button.setCheckable(True)
+        self.main_tab_button.setChecked(True)
+        self.main_tab_button.clicked.connect(lambda: self._switch_view(0))
+        self.main_tab_button.setStyleSheet("""
+            QPushButton {
+                padding: 10px 20px;
+                border: 1px solid #ccc;
+                border-bottom: none;
+                background-color: #f0f0f0;
+                font-weight: bold;
+            }
+            QPushButton:checked {
+                background-color: white;
+            }
+        """)
+        tab_layout.addWidget(self.main_tab_button)
+
+        self.console_tab_button = QPushButton("Console")
+        self.console_tab_button.setCheckable(True)
+        self.console_tab_button.clicked.connect(lambda: self._switch_view(1))
+        self.console_tab_button.setStyleSheet("""
+            QPushButton {
+                padding: 10px 20px;
+                border: 1px solid #ccc;
+                border-bottom: none;
+                background-color: #f0f0f0;
+                font-weight: bold;
+            }
+            QPushButton:checked {
+                background-color: white;
+            }
+        """)
+        tab_layout.addWidget(self.console_tab_button)
+
+        tab_layout.addStretch()
+        layout.addLayout(tab_layout)
+
+        # Stacked widget for views
+        self.stacked_widget = QStackedWidget()
+        layout.addWidget(self.stacked_widget)
+
+        # Main view with scroll area for buttons
+        main_view = QWidget()
+        main_view_layout = QVBoxLayout(main_view)
+        main_view_layout.setContentsMargins(0, 0, 0, 0)
+
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
@@ -69,7 +125,25 @@ class MainWindow(QMainWindow):
         self.buttons_layout.setSpacing(10)
 
         scroll_area.setWidget(self.buttons_container)
-        layout.addWidget(scroll_area)
+        main_view_layout.addWidget(scroll_area)
+
+        self.stacked_widget.addWidget(main_view)
+
+        # Console view
+        self.console_view = ConsoleView()
+        self.stacked_widget.addWidget(self.console_view)
+
+        # Connect signals with QueuedConnection for thread safety
+        self.output_signal.connect(
+            self.console_view.append_output, Qt.ConnectionType.QueuedConnection
+        )
+        self.error_signal.connect(
+            self.console_view.append_error, Qt.ConnectionType.QueuedConnection
+        )
+
+        # Set up command storage callbacks
+        command_storage.set_output_callback(self._on_command_output)
+        command_storage.set_error_callback(self._on_command_error)
 
         # Bottom toolbar
         bottom_layout = QHBoxLayout()
@@ -93,6 +167,22 @@ class MainWindow(QMainWindow):
         self._refresh_buttons()
 
         logger.info("Main window initialized")
+
+    def _switch_view(self, index: int) -> None:
+        """Switch between main view and console view."""
+        self.stacked_widget.setCurrentIndex(index)
+        self.main_tab_button.setChecked(index == 0)
+        self.console_tab_button.setChecked(index == 1)
+
+    @Slot(str)
+    def _on_command_output(self, text: str) -> None:
+        """Handle command output."""
+        self.output_signal.emit(text)
+
+    @Slot(str)
+    def _on_command_error(self, text: str) -> None:
+        """Handle command error output."""
+        self.error_signal.emit(text)
 
     def _refresh_buttons(self) -> None:
         """Refresh the button grid based on current commands."""
