@@ -38,8 +38,8 @@ class ConsoleView(QWidget):
 
     def _strip_ansi_codes(self, text: str) -> str:
         """Strip ANSI color/formatting codes from text."""
-        ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-        return ansi_escape.sub('', text)
+        ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+        return ansi_escape.sub("", text)
 
     @Slot(str)
     def append_output(self, text: str) -> None:
@@ -82,4 +82,3 @@ class ConsoleView(QWidget):
     def clear(self) -> None:
         """Clear the console output."""
         self.console_text.clear()
-
